@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo de Física Ultra Ultra Ultra Realista - Slime</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB, #ffffff);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #gameArea {
+            position: relative;
+            width: 80vw;
+            height: 80vh;
+            background-color: #f0f0f0;
+            overflow: hidden;
+            border: 2px solid #333;
+            border-radius: 15px;
+        }
+        #slime {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle, rgba(0, 255, 0, 0.9), rgba(0, 200, 0, 0.5));
+            border-radius: 50% 50% 60% 60%;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            cursor: grab;
+            transition: transform 0.1s ease-in-out;
+            will-change: transform;
+        }
+        #ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background-color: #333;
+        }
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background-color: rgba(0, 255, 0, 0.7);
+            pointer-events: none;
+            animation: fadeOut 1s forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(2); }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameArea">
+        <div id="slime"></div>
+        <div id="ground"></div>
+    </div>
+    <script>
+        const slime = document.getElementById("slime");
+        const gameArea = document.getElementById("gameArea");
+        const ground = document.getElementById("ground");
+
+        // Parâmetros de física
+        let gravity = 0.5; // Aceleração da gravidade
+        let velocityY = 0; // Velocidade vertical do slime
+        let posX = gameArea.clientWidth / 2 - 25; // Posição horizontal inicial
+        let posY = 0; // Posição vertical inicial
+        let jumpStrength = -10; // Força do pulo
+        let onGround = false; // Indica se o slime está no chão
+        let bounceFactor = 0.7; // Fator de quique
+        let deformation = 0; // Deformação do slime
+        let isDragging = false; // Indica se o slime está sendo arrastado
+        let mass = 1; // Massa do slime para simulação
+        let particleCount = 10; // Número de partículas a serem geradas
+
+        function update() {
+            // Se o slime não está sendo arrastado, aplicar gravidade
+            if (!isDragging) {
+                velocityY += gravity; // Aumenta a velocidade vertical devido à gravidade
+                posY += velocityY; // Atualiza a posição vertical
+
+                // Verifica colisão com o chão
+                if (posY + slime.clientHeight >= gameArea.clientHeight - ground.clientHeight) {
+                    posY = gameArea.clientHeight - ground.clientHeight - slime.clientHeight; // Coloca o slime no chão
+                    velocityY *= -bounceFactor; // Inverte a velocidade para simular o quique
+                    deformation = Math.abs(velocityY) * 2; // A deformação é proporcional à velocidade
+                    deformation = Math.min(deformation, 20); // Limita a deformação máxima
+
+                    // Gera partículas ao quicar
+                    generateParticles(posX + 25, posY + slime.clientHeight);
+                } else {
+                    deformation *= 0.9; // Gradualmente volta à forma original
+                }
+            } else {
+                deformation = Math.min(deformation + 0.5, 10); // Aumenta a deformação ao arrastar
+            }
+
+            // Atualiza a posição do slime
+            slime.style.left = `${posX}px`;
+            slime.style.top = `${posY}px`;
+
+            // Efeito de deformação
+            slime.style.transform = `scaleY(${1 - deformation / 100})`; // Deformação ao cair
+
+            requestAnimationFrame(update); // Atualiza o quadro de animação
+        }
+
+        // Gera partículas ao quicar
+        function generateParticles(x, y) {
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement("div");
+                particle.className = "particle";
+                const size = Math.random() * 5 + 5; // Tamanho aleatório
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                particle.style.transform = `translate(-50%, -50%)`;
+                gameArea.appendChild(particle);
+
+                // Animação de movimento
+                const angle = Math.random() * 2 * Math.PI;
+                const velocityX = Math.cos(angle) * 2; // Velocidade horizontal
+                const velocityY = Math.sin(angle) * 2; // Velocidade vertical
+                const duration = Math.random() * 500 + 300; // Duração da animação
+
+                particle.animate([
+                    { transform: `translate(-50%, -50%) translate(${velocityX}px, ${velocityY}px)` },
+                    { transform: `translate(-50%, -50%) translate(0, 0)`, opacity: 0 }
+                ], {
+                    duration: duration,
+                    easing: "ease-out",
+                    fill: "forwards"
+                });
+
+                // Remove a partícula após a animação
+                setTimeout(() => {
+                    particle.remove();
+                }, duration);
+            }
+        }
+
+        // Função para iniciar o arraste
+        function startDragging(event) {
+            isDragging = true;
+            slime.style.cursor = "grabbing"; // Muda o cursor para indicar que o slime pode ser arrastado
+            moveSlime(event);
+        }
+
+        // Função para mover o slime com o toque ou mouse
+        function moveSlime(event) {
+            if (isDragging) {
+                const rect = gameArea.getBoundingClientRect();
+                posX = event.clientX - rect.left - (slime.clientWidth / 2); // Calcula a nova posição horizontal
+                posY = event.clientY - rect.top - (slime.clientHeight / 2); // Calcula a nova posição vertical
+                // Limitar a posição para que o slime não saia da área do jogo
+                posX = Math.max(0, Math.min(posX, gameArea.clientWidth - slime.clientWidth));
+                posY = Math.max(0, Math.min(posY, gameArea.clientHeight - ground.clientHeight - slime.clientHeight));
+            }
+        }
+
+        // Função para parar o arraste
+        function stopDragging() {
+            isDragging = false;
+            slime.style.cursor = "grab"; // Restaura o cursor original
+        }
+
+        // Eventos de mouse
+        slime.addEventListener("mousedown", startDragging);
+        window.addEventListener("mousemove", moveSlime);
+        window.addEventListener("mouseup", stopDragging);
+
+        // Eventos de toque
+        slime.addEventListener("touchstart", (event) => {
+            startDragging(event.touches[0]);
+            event.preventDefault(); // Previne o comportamento padrão do toque
+        });
+        window.addEventListener("touchmove", (event) => {
+            moveSlime(event.touches[0]);
+            event.preventDefault();
+        });
+        window.addEventListener("touchend", stopDragging);
+
+        update(); // Inicia o loop de atualização
+    </script>
+</body>
+</html>
